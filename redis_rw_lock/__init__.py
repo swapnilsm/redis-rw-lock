@@ -7,19 +7,21 @@ class RWLock:
     READ = 'R'
     WRITE = 'W'
 
-    def __init__(self, redis_conn, name, mode, expire=None, ):
+    def __init__(self, redis_conn, name, mode, expire=None, auto_renew=False):
         assert mode in (self.READ, self.WRITE), 'Invalid mode.'
         assert name, 'Invalid name. Should not be empty'
 
         self.__mode = mode
-        self.__read_switch = _LightSwitch(redis_conn, 'read_switch:{}'.format(name), expire=expire)
-        self.__write_switch = _LightSwitch(redis_conn, 'write_switch:{}'.format(name), expire=expire)
+        self.__read_switch = _LightSwitch(
+            redis_conn, 'read_switch:{}'.format(name), expire=expire, auto_renew=auto_renew)
+        self.__write_switch = _LightSwitch(
+            redis_conn, 'write_switch:{}'.format(name), expire=expire, auto_renew=auto_renew)
         self.__no_readers = redis_lock.Lock(
-            redis_conn, 'lock:no_readers:{}'.format(name), expire=expire)
+            redis_conn, 'lock:no_readers:{}'.format(name), expire=expire, auto_renewal=auto_renew)
         self.__no_writers = redis_lock.Lock(
-            redis_conn, 'lock:no_writers:{}'.format(name), expire=expire)
+            redis_conn, 'lock:no_writers:{}'.format(name), expire=expire, auto_renewal=auto_renew)
         self.__readers_queue = redis_lock.Lock(
-            redis_conn, 'lock:readers_queue:{}'.format(name), expire=expire)
+            redis_conn, 'lock:readers_queue:{}'.format(name), expire=expire, auto_renewal=auto_renew)
 
     def __reader_acquire(self):
         self.__readers_queue.acquire()
@@ -53,13 +55,13 @@ class RWLock:
 class _LightSwitch:
     """An auxiliary "light switch"-like object. The first thread turns on the
     "switch", the last one turns it off."""
-    def __init__(self, redis_conn, name, expire=None):
+    def __init__(self, redis_conn, name, expire=None, auto_renew=False):
         self.__counter_name = 'lock:switch:counter:{}'.format(name)
         self.__name = name
         self.__redis_conn = redis_conn
         self.__redis_conn.set(self.__counter_name, 0)
         self.__mutex = redis_lock.Lock(
-            redis_conn, 'lock:switch:{}'.format(name), expire=expire)
+            redis_conn, 'lock:switch:{}'.format(name), expire=expire, auto_renewal=auto_renew)
 
     def acquire(self, lock):
         self.__mutex.acquire()

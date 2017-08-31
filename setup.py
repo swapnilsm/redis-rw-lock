@@ -19,7 +19,7 @@ def read(*names, **kwargs):
 
 setup(
     name='redis-rw-lock',
-    version='1.0.3',
+    version='1.0.4',
     license='MIT',
     description="Redis based Reader-Writer lock with Writer's priority.",
     long_description='',
