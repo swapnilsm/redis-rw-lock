@@ -34,12 +34,12 @@ class Writer(threading.Thread):
 
     def run(self):
         time.sleep(self.__init_sleep_time)
-        self.__rw_lock.writer_acquire()
+        self.__rw_lock.acquire()
         self.entry_time = time.time()
         time.sleep(self.__sleep_time)
         self.__buffer.append(self.__to_write)
         self.exit_time = time.time()
-        self.__rw_lock.writer_release()
+        self.__rw_lock.release()
 
 
 class Reader(threading.Thread):
@@ -67,22 +67,22 @@ class Reader(threading.Thread):
 
     def run(self):
         time.sleep(self.__init_sleep_time)
-        self.__rw_lock.reader_acquire()
+        self.__rw_lock.acquire()
         self.entry_time = time.time()
         time.sleep(self.__sleep_time)
         self.buffer_read = copy.deepcopy(self.__buffer)
         self.exit_time = time.time()
-        self.__rw_lock.reader_release()
+        self.__rw_lock.release()
 
 
 class RWLockTestCase(unittest.TestCase):
     def test_readers_nonexclusive_access(self):
         (buffer_, threads) = self.__init_variables()
 
-        threads.append(Reader(buffer_, self.__generate_lock(), 0, 1))
-        threads.append(Writer(buffer_, self.__generate_lock(), 0.4, 1, 1))
-        threads.append(Reader(buffer_, self.__generate_lock(), 1, 1))
-        threads.append(Reader(buffer_, self.__generate_lock(), 1.2, 0.2))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0, 1))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0.4, 1, 1))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 1, 1))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 1.2, 0.2))
 
         self.__start_and_join_threads(threads)
 
@@ -101,9 +101,9 @@ class RWLockTestCase(unittest.TestCase):
     def test_writers_exclusive_access(self):
         (buffer_, threads) = self.__init_variables()
 
-        threads.append(Writer(buffer_, self.__generate_lock(), 0, 0.4, 1))
-        threads.append(Writer(buffer_, self.__generate_lock(), 0.1, 0, 2))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.2, 0))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0, 0.4, 1))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0.1, 0, 2))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.2, 0))
 
         self.__start_and_join_threads(threads)
 
@@ -116,11 +116,11 @@ class RWLockTestCase(unittest.TestCase):
     def test_writer_priority(self):
         (buffer_, threads) = self.__init_variables()
 
-        threads.append(Writer(buffer_, self.__generate_lock(), 0, 0, 1))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.1, 0.4))
-        threads.append(Writer(buffer_, self.__generate_lock(), 0.2, 0, 2))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.3, 0))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.3, 0))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0, 0, 1))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.1, 0.4))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0.2, 0, 2))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.3, 0))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.3, 0))
 
         self.__start_and_join_threads(threads)
 
@@ -137,12 +137,12 @@ class RWLockTestCase(unittest.TestCase):
     def test_many_writers_priority(self):
         (buffer_, threads) = self.__init_variables()
 
-        threads.append(Writer(buffer_, self.__generate_lock(), 0, 0, 1))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.1, 0.6))
-        threads.append(Writer(buffer_, self.__generate_lock(), 0.2, 0.1, 2))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.3, 0))
-        threads.append(Reader(buffer_, self.__generate_lock(), 0.4, 0))
-        threads.append(Writer(buffer_, self.__generate_lock(), 0.5, 0.1, 3))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0, 0, 1))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.1, 0.6))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0.2, 0.1, 2))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.3, 0))
+        threads.append(Reader(buffer_, self.__generate_reader_lock(), 0.4, 0))
+        threads.append(Writer(buffer_, self.__generate_writer_lock(), 0.5, 0.1, 3))
 
         self.__start_and_join_threads(threads)
 
@@ -167,9 +167,14 @@ class RWLockTestCase(unittest.TestCase):
         return (buffer_, threads)
 
     @staticmethod
-    def __generate_lock(name='RWLock'):
+    def __generate_reader_lock(name='RWLock'):
         redis_conn = redis.StrictRedis()
-        return RWLock(redis_conn, name)
+        return RWLock(redis_conn, name, mode=RWLock.READ)
+
+    @staticmethod
+    def __generate_writer_lock(name='RWLock'):
+        redis_conn = redis.StrictRedis()
+        return RWLock(redis_conn, name, mode=RWLock.WRITE)
 
     @staticmethod
     def __start_and_join_threads(threads):
