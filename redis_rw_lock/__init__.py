@@ -51,6 +51,13 @@ class RWLock:
             return self.__reader_release()
         return self.__writer_release()
 
+    def reset(self):
+        self.__read_switch.reset()
+        self.__write_switch.reset()
+        self.__no_readers.reset()
+        self.__no_readers.reset()
+        self.__readers_queue.reset()
+
 
 class _LightSwitch:
     """An auxiliary "light switch"-like object. The first thread turns on the
@@ -76,3 +83,6 @@ class _LightSwitch:
         if int(self.__redis_conn.get(self.__counter_name)) == 0:
             lock.reset()
         self.__mutex.release()
+
+    def reset(self):
+        self.__mutex.reset()
