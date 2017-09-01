@@ -1,5 +1,6 @@
 # Author: Swapnil Mahajan
 import redis_lock
+import logging
 
 
 class RWLock:
@@ -65,24 +66,34 @@ class _LightSwitch:
     def __init__(self, redis_conn, name, expire=None, auto_renew=False):
         self.__counter_name = 'lock:switch:counter:{}'.format(name)
         self.__name = name
+        self.__expire = expire
         self.__redis_conn = redis_conn
-        self.__redis_conn.set(self.__counter_name, 0)
+        self.__redis_conn.set(self.__counter_name, 0, nx=True, ex=self.__expire)
+        counter_value = int(self.__redis_conn.get(self.__counter_name))
+        logging.debug('Counter - Initial Value - {}: {}'.format(self.__counter_name, counter_value))
         self.__mutex = redis_lock.Lock(
             redis_conn, 'lock:switch:{}'.format(name), expire=expire, auto_renewal=auto_renew)
 
     def acquire(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.incr(self.__counter_name)
-        if int(self.__redis_conn.get(self.__counter_name)) == 1:
+        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        counter_value = int(self.__redis_conn.get(self.__counter_name))
+        logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
+        if counter_value == 1:
             lock.acquire()
         self.__mutex.release()
 
     def release(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.decr(self.__counter_name)
-        if int(self.__redis_conn.get(self.__counter_name)) == 0:
+        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        counter_value = int(self.__redis_conn.get(self.__counter_name))
+        logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
+        if counter_value == 0:
             lock.reset()
         self.__mutex.release()
 
     def reset(self):
         self.__mutex.reset()
+        self.__redis_conn.set(self.__counter_name, 0)
