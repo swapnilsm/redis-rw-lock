@@ -21,14 +21,14 @@ jobs:
           - v1-dependencies-
 
       - run:
-          name: install dependencies
+          name: Install Dependencies
           command: |
             python3 -m venv venv
             . venv/bin/activate
             python setup.py develop
             
       - run:
-          name: install redis
+          name: Install Redis
           command: |
             pushd /tmp
             wget http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
