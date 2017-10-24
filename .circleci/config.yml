@@ -7,10 +7,6 @@ jobs:
   build:
     docker:
       - image: circleci/python:3.6.1
-    
-      machine:
-        services:
-          - redis
       
     working_directory: ~/repo
 
@@ -30,6 +26,18 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             python setup.py develop
+            
+      - run:
+          name: install redis
+          command: |
+            pushd /tmp
+            wget http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
+            tar xzf redis-$REDIS_VERSION.tar.gz
+            cd redis-$REDIS_VERSION && make
+            src/redis-server --daemonize yes
+            popd
+          environment:
+            REDIS_VERSION: 3.2.10
 
       - save_cache:
           paths:
