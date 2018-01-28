@@ -8,7 +8,7 @@ class RWLock:
     READ = 'R'
     WRITE = 'W'
 
-    def __init__(self, redis_conn, name, mode, expire=None, auto_renew=False):
+    def __init__(self, redis_conn, name, mode, expire=30, auto_renew=False):
         assert mode in (self.READ, self.WRITE), 'Invalid mode.'
         assert name, 'Invalid name. Should not be empty'
 
