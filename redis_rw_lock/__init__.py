@@ -77,7 +77,8 @@ class _LightSwitch:
     def acquire(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.incr(self.__counter_name)
-        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        if self.__expire:
+            self.__redis_conn.expire(self.__counter_name, self.__expire)
         counter_value = int(self.__redis_conn.get(self.__counter_name))
         logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
         if counter_value == 1:
@@ -87,7 +88,8 @@ class _LightSwitch:
     def release(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.decr(self.__counter_name)
-        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        if self.__expire:
+            self.__redis_conn.expire(self.__counter_name, self.__expire)
         counter_value = int(self.__redis_conn.get(self.__counter_name))
         logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
         if counter_value == 0:
