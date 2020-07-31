@@ -14,15 +14,15 @@ class RWLock:
 
         self.__mode = mode
         self.__read_switch = _LightSwitch(
-            redis_conn, 'read_switch:{}'.format(name), expire=expire, auto_renew=auto_renew)
+            redis_conn, f'read_switch:{name}', expire=expire, auto_renew=auto_renew)
         self.__write_switch = _LightSwitch(
-            redis_conn, 'write_switch:{}'.format(name), expire=expire, auto_renew=auto_renew)
+            redis_conn, f'write_switch:{name}', expire=expire, auto_renew=auto_renew)
         self.__no_readers = redis_lock.Lock(
-            redis_conn, 'lock:no_readers:{}'.format(name), expire=expire, auto_renewal=auto_renew)
+            redis_conn, f'lock:no_readers:{name}', expire=expire, auto_renewal=auto_renew)
         self.__no_writers = redis_lock.Lock(
-            redis_conn, 'lock:no_writers:{}'.format(name), expire=expire, auto_renewal=auto_renew)
+            redis_conn, f'lock:no_writers:{name}', expire=expire, auto_renewal=auto_renew)
         self.__readers_queue = redis_lock.Lock(
-            redis_conn, 'lock:readers_queue:{}'.format(name), expire=expire, auto_renewal=auto_renew)
+            redis_conn, f'lock:readers_queue:{name}', expire=expire, auto_renewal=auto_renew)
 
     def __reader_acquire(self):
         self.__readers_queue.acquire()
@@ -64,22 +64,23 @@ class _LightSwitch:
     """An auxiliary "light switch"-like object. The first thread turns on the
     "switch", the last one turns it off."""
     def __init__(self, redis_conn, name, expire=None, auto_renew=False):
-        self.__counter_name = 'lock:switch:counter:{}'.format(name)
+        self.__counter_name = f'lock:switch:counter:{name}'
         self.__name = name
         self.__expire = expire
         self.__redis_conn = redis_conn
         self.__redis_conn.set(self.__counter_name, 0, nx=True, ex=self.__expire)
         counter_value = int(self.__redis_conn.get(self.__counter_name))
-        logging.debug('Counter - Initial Value - {}: {}'.format(self.__counter_name, counter_value))
+        logging.debug(f'Counter - Initial Value - {self.__counter_name}: {counter_value}')
         self.__mutex = redis_lock.Lock(
-            redis_conn, 'lock:switch:{}'.format(name), expire=expire, auto_renewal=auto_renew)
+            redis_conn, f'lock:switch:{name}', expire=expire, auto_renewal=auto_renew)
 
     def acquire(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.incr(self.__counter_name)
-        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        if self.__expire:
+            self.__redis_conn.expire(self.__counter_name, self.__expire)
         counter_value = int(self.__redis_conn.get(self.__counter_name))
-        logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
+        logging.debug(f'Counter {self.__counter_name}: {counter_value}')
         if counter_value == 1:
             lock.acquire()
         self.__mutex.release()
@@ -87,9 +88,10 @@ class _LightSwitch:
     def release(self, lock):
         self.__mutex.acquire()
         self.__redis_conn.decr(self.__counter_name)
-        self.__redis_conn.expire(self.__counter_name, self.__expire)
+        if self.__expire:
+            self.__redis_conn.expire(self.__counter_name, self.__expire)
         counter_value = int(self.__redis_conn.get(self.__counter_name))
-        logging.debug('Counter {}: {}'.format(self.__counter_name, counter_value))
+        logging.debug(f'Counter {self.__counter_name}: {counter_value}')
         if counter_value == 0:
             lock.reset()
         self.__mutex.release()
